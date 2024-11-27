@@ -1,0 +1,3 @@
+To compile in '/workspaces/SUPA_CPP_Labs/Exercises2024/Ex1_2/Assignment/run':
+run: 'g++ ../lib/AnalyseData.cxx ../lib/Functions.cxx -o macro_Assessment1' and execute binary!
+Output txt files placed in output dir.
