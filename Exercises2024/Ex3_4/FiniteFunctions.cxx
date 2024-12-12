@@ -4,7 +4,7 @@
 #include <cmath>
 #include "FiniteFunctions.h"
 #include <filesystem> //To check extensions in a nice way
-
+#include <random>
 #include "gnuplot-iostream.h" //Needed to produce plots (not part of the course) 
 
 using std::filesystem::path;
@@ -104,6 +104,7 @@ double NormalDistribution::normal_pmf(double x,double mean, double std_dev) {
     double pmf = (1 / (std_dev * (sqrt(2 * M_PI)))) * exp(exponent);
     return pmf;
 }
+
 double NormalDistribution::callFunction(double x) {return this->NormalDistribution::normal_pmf(x,nd_mean,nd_std_dev);}; 
 
 double CauchyLorentzDistribution::cauchy_pmf(double x, double mean, double gamma) {
@@ -169,6 +170,39 @@ double FiniteFunction::integral(int Ndiv) { //public
   }
   else return m_Integral; //Don't bother re-calculating integral if Ndiv is the same as the last call
 }
+
+
+
+
+std::vector<double> FiniteFunction::metropolis(std::vector<double> sample){
+    int n_random = 20000;
+    int seed = 6667;
+    std::mt19937 mtEngine(seed);  // Fixed seed
+    std::uniform_real_distribution<double> dicePDF(m_RMin, m_RMax);
+    std::uniform_real_distribution<double> distribution_TVar(0.0, 1.0);
+
+    double x_i = dicePDF(mtEngine);  // Initial random value
+
+    for (int i = 0; i < n_random; i++) {
+        double std_dev_i = 1.5; /*values within [0.7,8] seem to work properly -
+         outside this limit impede the strength of the sampling technique*/
+        std::normal_distribution<double> norm(x_i, std_dev_i);
+        double y = norm(mtEngine);
+
+        double fx = this->callFunction(x_i);
+        double fy = this->callFunction(y);
+
+        double A = std::min(fy / fx, 1.0);
+        double t = distribution_TVar(mtEngine);
+
+        if (t < A) {
+            x_i = y;  
+        }
+        sample.push_back(x_i);//fill sample
+    }
+    return sample;
+}
+
 
 /*
 ###################
