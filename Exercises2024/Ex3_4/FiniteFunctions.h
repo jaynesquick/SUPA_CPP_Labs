@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include <cmath>
 #include "gnuplot-iostream.h"
 
 #pragma once //Replacement for IFNDEF
@@ -21,10 +22,11 @@ public:
   
   //Plot the supplied data points (either provided data or points sampled from function) as a histogram using NBins
   void plotData(std::vector<double> &points, int NBins, bool isdata=true); //NB! use isdata flag to pick between data and sampled distributions
+
   virtual void printInfo(); //Dump parameter info about the current function (Overridable)
   virtual double callFunction(double x); //Call the function with value x (Overridable)
 
-  //Protected members can be accessed by child classes but not users
+//Protected members can be accessed by child classes but not users
 protected:
   double m_RMin;
   double m_RMax;
@@ -47,3 +49,56 @@ protected:
 private:
   double invxsquared(double x); //The default functional form
 };
+
+class NormalDistribution : public FiniteFunction{
+  public:
+  NormalDistribution();
+  NormalDistribution(double range_min, double range_max, std::string outfile, double mean, double std_dev); //Variable constructor
+
+  double callFunction(double x);
+  void printInfo();
+  protected:
+  
+  double nd_mean;
+  double nd_std_dev;
+
+  private:
+  double normal_pmf(double x,double mean, double std_dev);
+};
+
+
+class CauchyLorentzDistribution : public FiniteFunction{
+  public:
+  CauchyLorentzDistribution();
+  CauchyLorentzDistribution(double range_min, double range_max, std::string outfile, double mean, double gamma); //Variable constructor
+
+  double callFunction(double x);
+  void printInfo();
+  protected:
+  
+  double cl_mean;
+  double cl_gamma;
+
+  private:
+  double cauchy_pmf(double x,double mean, double gamma);
+};
+
+class NegCrystalBallDistribution : public FiniteFunction{
+  public:
+  NegCrystalBallDistribution();
+  NegCrystalBallDistribution(double range_min, double range_max, std::string outfile, double mean, double std_dev, double n, double alpha); 
+
+  double callFunction(double x);
+  void printInfo();
+  protected:
+  
+  double cb_mean;
+  double cb_std_dev;
+  double cb_n;
+  double cb_alpha;
+
+  private:
+  double crystalball_pmf(double x, double mean, double std_dev, double n, double alpha);
+};
+
+

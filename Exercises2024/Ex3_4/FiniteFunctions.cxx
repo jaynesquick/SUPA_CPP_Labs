@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cmath>
 #include "FiniteFunctions.h"
 #include <filesystem> //To check extensions in a nice way
 
@@ -31,6 +32,49 @@ FiniteFunction::~FiniteFunction(){
   this->generatePlot(gp); //Generate the plot and save it to a png using "outfile" for naming 
 }
 
+
+NormalDistribution::NormalDistribution() : FiniteFunction() {
+  nd_mean = 1.0;
+  nd_std_dev = 1.4;
+  std::cout << "Derived default constructor\n";
+}
+
+NormalDistribution::NormalDistribution(double range_min, double range_max, std::string outfile, double mean, double std_dev)  
+    : FiniteFunction(range_min, range_max, outfile), nd_mean(mean), nd_std_dev(std_dev) {
+    std::cout << "Derived parameterized constructor\n";
+}
+
+
+CauchyLorentzDistribution::CauchyLorentzDistribution() : FiniteFunction() {
+  cl_mean = 1.0;
+  cl_gamma = 1.4;
+  std::cout << "Derived default constructor\n";
+}
+
+CauchyLorentzDistribution::CauchyLorentzDistribution(double range_min, double range_max, std::string outfile, double mean, double gamma) 
+    : FiniteFunction(range_min, range_max, outfile), cl_mean(mean), cl_gamma(gamma) {
+    if (gamma <= 0) {
+        throw std::invalid_argument("Gamma must be positive.");
+    }
+    std::cout << "Derived parameterized constructor\n";
+}
+
+NegCrystalBallDistribution::NegCrystalBallDistribution() : FiniteFunction() {
+  cb_mean = -1.5;
+  cb_std_dev = 1.5;
+  cb_n = 2.0;
+  cb_alpha = 0.85;
+  std::cout << "Derived default constructor\n";
+}
+
+NegCrystalBallDistribution::NegCrystalBallDistribution(double range_min, double range_max, std::string outfile, double mean, double std_dev, double n, double alpha) 
+    : FiniteFunction(range_min, range_max, outfile), cb_mean(mean), cb_std_dev(std_dev),cb_n(n),cb_alpha(alpha)  {
+    if ((n <= 1)||(alpha<=0)) {
+        throw std::invalid_argument("fix arguments (n>1, alpha>0) :)");
+    }
+    std::cout << "Derived parameterized constructor\n";
+}
+
 /*
 ###################
 //Setters
@@ -47,7 +91,6 @@ void FiniteFunction::setOutfile(std::string Outfile) {this->checkPath(Outfile);}
 */ 
 double FiniteFunction::rangeMin() {return m_RMin;};
 double FiniteFunction::rangeMax() {return m_RMax;};
-
 /*
 ###################
 //Function eval
@@ -56,14 +99,63 @@ double FiniteFunction::rangeMax() {return m_RMax;};
 double FiniteFunction::invxsquared(double x) {return 1/(1+x*x);};
 double FiniteFunction::callFunction(double x) {return this->invxsquared(x);}; //(overridable)
 
+double NormalDistribution::normal_pmf(double x,double mean, double std_dev) {
+    double exponent = -pow(x - mean, 2) / (2 * pow(std_dev, 2));
+    double pmf = (1 / (std_dev * (sqrt(2 * M_PI)))) * exp(exponent);
+    return pmf;
+}
+double NormalDistribution::callFunction(double x) {return this->NormalDistribution::normal_pmf(x,nd_mean,nd_std_dev);}; 
+
+double CauchyLorentzDistribution::cauchy_pmf(double x, double mean, double gamma) {
+    // Probability density function for Cauchy-Lorentz distribution
+    double numerator = gamma;
+    double denominator = M_PI * (gamma * gamma + pow(x - mean, 2));
+    return numerator / denominator;
+}
+double CauchyLorentzDistribution::callFunction(double x) {
+    return this->cauchy_pmf(x, cl_mean, cl_gamma);
+}
+
+double NegCrystalBallDistribution::crystalball_pmf(double x, double mean, double std_dev, double n, double alpha) {
+    // Probability density function for crystal ball
+    double exponent = -pow(fabs(alpha), 2) / 2;
+    double A_coeff = pow(n/fabs(alpha),n)*exp(exponent);
+    double B_coeff = n/fabs(alpha) - fabs(alpha);
+    double D_coeff = sqrt(M_PI/2)*(1+std::erf(fabs(alpha)/sqrt(2)));
+    double C_coeff = (n/alpha)*(1/(n-1))*exp(exponent);
+    double N_coeff = 1.0/(std_dev*(C_coeff+D_coeff));
+    double condition_val = (x-mean)/std_dev;
+
+    if (condition_val>-alpha) {
+      double condition_greater_exponent = -pow(x-mean,2)/(2*pow(std_dev,2));
+      return N_coeff*exp(condition_greater_exponent);}
+    else if (condition_val<=-alpha) {
+      return N_coeff*A_coeff*pow((B_coeff-(x-mean)/std_dev),-n);}
+    else throw std::invalid_argument("Alpha is nonsensical");
+}
+
+double NegCrystalBallDistribution::callFunction(double x) {
+    return this->crystalball_pmf(x, cb_mean, cb_std_dev, cb_n, cb_alpha);
+}
+
 /*
 ###################
 Integration by hand (output needed to normalise function when plotting)
 ###################
 */ 
 double FiniteFunction::integrate(int Ndiv){ //private
-  //ToDo write an integrator
-  return -99;  
+  double count;
+  double range = m_RMax-m_RMin;
+  double step = range/(double)Ndiv;
+  double x = m_RMin;
+  for (unsigned int i=0; i<Ndiv; i++){
+    double integral_mini;
+    integral_mini=callFunction(x);
+    x += range/Ndiv;
+    count+=integral_mini*step;
+  }
+  //get bin contents over the for loop AND TIMES BY STEP SIZE :-)
+  return count;
 }
 double FiniteFunction::integral(int Ndiv) { //public
   if (Ndiv <= 0){
@@ -95,6 +187,33 @@ void FiniteFunction::checkPath(std::string outfile){
 void FiniteFunction::printInfo(){
   std::cout << "rangeMin: " << m_RMin << std::endl;
   std::cout << "rangeMax: " << m_RMax << std::endl;
+  std::cout << "integral: " << m_Integral << ", calculated using " << m_IntDiv << " divisions" << std::endl;
+  std::cout << "function: " << m_FunctionName << std::endl;
+}
+
+void NormalDistribution::printInfo() {
+  std::cout << "rangeMin: " << m_RMin << std::endl;
+  std::cout << "rangeMax: " << m_RMax << std::endl;
+  std::cout << "Mean: " << nd_mean << std::endl;
+  std::cout << "standard deviation: " << nd_std_dev << std::endl; 
+  std::cout << "integral: " << m_Integral << ", calculated using " << m_IntDiv << " divisions" << std::endl;
+  std::cout << "function: " << m_FunctionName << std::endl;
+}
+void CauchyLorentzDistribution::printInfo() {
+  std::cout << "rangeMin: " << m_RMin << std::endl;
+  std::cout << "rangeMax: " << m_RMax << std::endl;
+  std::cout << "Mean: " << cl_mean << std::endl;
+  std::cout << "Gamma: " << cl_gamma << std::endl; 
+  std::cout << "integral: " << m_Integral << ", calculated using " << m_IntDiv << " divisions" << std::endl;
+  std::cout << "function: " << m_FunctionName << std::endl;
+}
+void NegCrystalBallDistribution::printInfo() {
+  std::cout << "rangeMin: " << m_RMin << std::endl;
+  std::cout << "rangeMax: " << m_RMax << std::endl;
+  std::cout << "Mean: " << cb_mean << std::endl;
+  std::cout << "Standard Deviation: " << cb_std_dev << std::endl; 
+  std::cout << "n: " << cb_n << std::endl;
+  std::cout << "Alpha: " << cb_alpha << std::endl; 
   std::cout << "integral: " << m_Integral << ", calculated using " << m_IntDiv << " divisions" << std::endl;
   std::cout << "function: " << m_FunctionName << std::endl;
 }
